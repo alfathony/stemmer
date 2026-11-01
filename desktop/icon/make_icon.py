@@ -80,3 +80,23 @@ if __name__ == "__main__":
                            check=True, capture_output=True)
     subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(HERE / "Stemmer.icns")], check=True)
     print("wrote", HERE / "Stemmer.icns")
+
+    # Windows .ico: PNG-compressed entries, which Windows Vista+ reads natively.
+    sizes = [16, 24, 32, 48, 64, 128, 256]
+    pngs = []
+    for px in sizes:
+        out = iconset / f"ico_{px}.png"
+        subprocess.run(["sips", "-z", str(px), str(px), str(png), "--out", str(out)],
+                       check=True, capture_output=True)
+        pngs.append(out.read_bytes())
+    header = struct.pack("<HHH", 0, 1, len(sizes))
+    offset = 6 + 16 * len(sizes)
+    entries = b""
+    for px, data in zip(sizes, pngs):
+        entries += struct.pack("<BBBBHHII", px % 256, px % 256, 0, 0, 1, 32, len(data), offset)
+        offset += len(data)
+    (HERE / "Stemmer.ico").write_bytes(header + entries + b"".join(pngs))
+    print("wrote", HERE / "Stemmer.ico")
+    import shutil
+
+    shutil.rmtree(iconset)

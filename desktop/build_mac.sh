@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$ROOT/backend/.venv/bin/python"
 MODELS="${STEMMER_MODELS:-$HOME/.cache/torch/hub/checkpoints}"
+export STEMMER_VERSION="${STEMMER_VERSION:-0.1.0}"
 
 # Both Demucs models must be downloaded once so they can be bundled.
 for model in htdemucs htdemucs_6s; do

@@ -1,0 +1,150 @@
+name: Build installers
+
+# Push a tag like v0.2.0 to build both installers and publish them as a
+# GitHub release. "Run workflow" on the Actions tab builds them without
+# releasing (download from the run's Artifacts).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  mac:
+    name: macOS (Apple Silicon)
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        run: echo "STEMMER_VERSION=$(./desktop/version.sh)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache Demucs models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/torch/hub/checkpoints
+          key: demucs-models-v1
+
+      - name: Install dependencies
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/python -m pip install --upgrade pip
+          backend/.venv/bin/python -m pip install -r backend/requirements.txt -r desktop/requirements.txt -c desktop/constraints.txt
+          npm ci --prefix frontend
+
+      - name: Build app and DMG
+        run: ./desktop/build_mac.sh
+
+      - name: Self-test the packaged app
+        run: |
+          desktop/dist/Stemmer.app/Contents/MacOS/Stemmer --selftest "$PWD/selftest.json" || status=$?
+          cat selftest.json
+          exit ${status:-0}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stemmer-${{ env.STEMMER_VERSION }}-mac-arm64
+          path: desktop/dist/Stemmer-*-mac-arm64.dmg
+          compression-level: 0
+          if-no-files-found: error
+
+  windows:
+    name: Windows (x64)
+    runs-on: windows-2022
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        shell: bash
+        run: echo "STEMMER_VERSION=$(./desktop/version.sh)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache Demucs models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/torch/hub/checkpoints
+          key: demucs-models-v1
+
+      - name: Install dependencies
+        run: |
+          python -m venv backend\.venv
+          backend\.venv\Scripts\python.exe -m pip install --upgrade pip
+          backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt -r desktop\requirements.txt -c desktop\constraints.txt
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm ci --prefix frontend
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Build app and installer
+        run: ./desktop/build_windows.ps1
+
+      - name: Self-test the packaged app
+        run: |
+          $p = Start-Process -FilePath desktop\dist\Stemmer\Stemmer.exe -ArgumentList "--selftest", "$PWD\selftest.json" -Wait -PassThru
+          Get-Content selftest.json
+          exit $p.ExitCode
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stemmer-${{ env.STEMMER_VERSION }}-windows-x64
+          path: desktop/dist/Stemmer-*-windows-x64-setup.exe
+          compression-level: 0
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [mac, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          (cd assets && sha256sum * > SHA256SUMS.txt)
+          sed "s/{VERSION}/$VERSION/g" desktop/RELEASE_NOTES.md > notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" assets/* --clobber
+          else
+            gh release create "$TAG" assets/* --title "Stemmer $VERSION" --notes-file notes.md
+          fi

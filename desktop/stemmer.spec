@@ -1,11 +1,15 @@
-# PyInstaller build for Stemmer.app. Use build_mac.sh rather than running this directly.
+# PyInstaller build for Stemmer (macOS .app or Windows folder).
+# Use build_mac.sh / build_windows.ps1 rather than running this directly.
 import os
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 
 ROOT = Path(SPECPATH).parent
 MODELS = Path(os.environ.get("STEMMER_MODELS", Path.home() / ".cache/torch/hub/checkpoints"))
+VERSION = os.environ.get("STEMMER_VERSION", "0.1.0")
+MAC = sys.platform == "darwin"
 
 datas = [
     (str(ROOT / "frontend" / "dist"), "frontend"),
@@ -17,7 +21,7 @@ datas = [
 # Ship each bundled package's metadata, which carries its license file.
 for dist in ["torch", "torchaudio", "numpy", "scipy", "numba", "llvmlite", "librosa", "demucs",
              "fastapi", "starlette", "uvicorn", "pydantic", "soundfile", "lameenc",
-             "imageio-ffmpeg", "pywebview", "pyobjc-core"]:
+             "imageio-ffmpeg", "pywebview", "pyobjc-core" if MAC else "pythonnet"]:
     datas += copy_metadata(dist)
 binaries = []
 hiddenimports = collect_submodules("uvicorn")
@@ -46,20 +50,23 @@ exe = EXE(
     exclude_binaries=True,
     name="Stemmer",
     console=False,
-    target_arch="arm64",
+    target_arch="arm64" if MAC else None,
+    icon=str(ROOT / "desktop" / "icon" / ("Stemmer.icns" if MAC else "Stemmer.ico")),
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="Stemmer")
-app = BUNDLE(
-    coll,
-    name="Stemmer.app",
-    icon=str(ROOT / "desktop" / "icon" / "Stemmer.icns"),
-    bundle_identifier="app.stemmer.desktop",
-    info_plist={
-        "CFBundleDisplayName": "Stemmer",
-        "CFBundleShortVersionString": "0.1.0",
-        "CFBundleVersion": "1",
-        "LSMinimumSystemVersion": "12.0",
-        "NSHighResolutionCapable": True,
-        "NSRequiresAquaSystemAppearance": False,
-    },
-)
+
+if MAC:
+    app = BUNDLE(
+        coll,
+        name="Stemmer.app",
+        icon=str(ROOT / "desktop" / "icon" / "Stemmer.icns"),
+        bundle_identifier="app.stemmer.desktop",
+        info_plist={
+            "CFBundleDisplayName": "Stemmer",
+            "CFBundleShortVersionString": VERSION,
+            "CFBundleVersion": VERSION,
+            "LSMinimumSystemVersion": "12.0",
+            "NSHighResolutionCapable": True,
+            "NSRequiresAquaSystemAppearance": False,
+        },
+    )

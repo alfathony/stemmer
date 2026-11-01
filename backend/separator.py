@@ -12,6 +12,8 @@ MODELS = {
 }
 
 _PERCENT = re.compile(r"(\d{1,3})%\|")
+# Keep child processes from flashing a console window on Windows.
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def pick_device() -> str:
@@ -68,6 +70,7 @@ def _run(
     env = {**os.environ, "PYTORCH_ENABLE_MPS_FALLBACK": "1"}
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
+        creationflags=NO_WINDOW,
     )
 
     # tqdm redraws with '\r', so read raw bytes and split on both separators.

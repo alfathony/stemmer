@@ -113,6 +113,66 @@ def run_demucs(args: list[str]) -> None:
     main(args)
 
 
+def run_selftest(report: Path) -> None:
+    """Run the whole pipeline on a generated 128 BPM 4/4 drum loop, without a
+    window, and write the result to `report` as JSON. CI runs this against
+    the packaged app to check the bundle really works."""
+    import json
+    import shutil
+    import traceback
+
+    result: dict = {"ok": False}
+    try:
+        support = support_dir()
+        setup_env(support)
+        if not FROZEN:
+            sys.path.insert(0, str(BUNDLE / "backend"))
+        import numpy as np
+        import soundfile as sf
+
+        from app import DATA_DIR, STATIC_DIR, Job, run_job
+
+        sr, bpm, secs = 44100, 128, 20
+        y = np.zeros(sr * secs)
+        t = np.arange(int(sr * 0.15)) / sr
+        kick = np.sin(2 * np.pi * 55 * t) * np.exp(-t * 25)
+        snare = np.random.default_rng(0).standard_normal(len(t)) * np.exp(-t * 40) * 0.5
+        hat = np.random.default_rng(1).standard_normal(len(t)) * np.exp(-t * 80) * 0.2
+        for i in range(int(secs * bpm / 60)):
+            start = int(i * 60 / bpm * sr)
+            hit = (kick, hat, snare, hat)[i % 4]
+            end = min(len(y), start + len(t))
+            y[start:end] += hit[: end - start]
+
+        job = Job(id="selftest", name="selftest.wav", mode="4stems")
+        job_dir = DATA_DIR / job.id
+        shutil.rmtree(job_dir, ignore_errors=True)
+        job_dir.mkdir(parents=True)
+        src = job_dir / "input.wav"
+        sf.write(src, np.stack([y, y], axis=1) * 0.6, sr)
+
+        started = time.time()
+        run_job(job, src)
+        result = {
+            **job.public(),
+            "seconds": round(time.time() - started, 1),
+            "ui_present": bool(STATIC_DIR) and (Path(STATIC_DIR) / "index.html").exists(),
+        }
+        a = job.analysis or {}
+        result["ok"] = (
+            job.status == "done"
+            and sorted(job.stems) == ["bass", "drums", "other", "vocals"]
+            and abs((a.get("bpm") or 0) - bpm) < 2
+            and a.get("time_signature") == "4/4"
+            and result["ui_present"]
+        )
+        shutil.rmtree(job_dir, ignore_errors=True)
+    except Exception:
+        result["error"] = traceback.format_exc()
+    report.write_text(json.dumps(result, indent=2, default=str))
+    sys.exit(0 if result["ok"] else 1)
+
+
 def run_app() -> None:
     support = support_dir()
     if FROZEN:
@@ -149,5 +209,7 @@ if __name__ == "__main__":
     multiprocessing.freeze_support()
     if len(sys.argv) > 1 and sys.argv[1] == "--demucs":
         run_demucs(sys.argv[2:])
+    elif len(sys.argv) > 2 and sys.argv[1] == "--selftest":
+        run_selftest(Path(sys.argv[2]))
     else:
         run_app()

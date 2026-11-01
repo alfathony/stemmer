@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from analysis import analyze
-from separator import MODELS, separate
+from separator import MODELS, NO_WINDOW, separate
 
 # The desktop app points these at Application Support and the bundled UI.
 DATA_DIR = Path(os.environ.get("STEMMER_DATA_DIR", Path(__file__).parent / "data"))
@@ -67,7 +67,7 @@ def extract_audio(src: Path) -> Path:
     result = subprocess.run(
         ["ffmpeg", "-nostdin", "-y", "-loglevel", "error", "-i", str(src),
          "-vn", "-ac", "2", "-ar", "44100", str(dst)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, creationflags=NO_WINDOW,
     )
     if result.returncode != 0 or not dst.exists():
         raise RuntimeError(f"Couldn't read audio from this file. {result.stderr.strip()[-300:]}")
