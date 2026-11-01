@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stemmer</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Stem separator</p>
+        <h1>Stemmer</h1>
+        <p class="lede">Split a song into vocals, drums, bass and the rest, then remix it.</p>
+      </header>
+
+      <section id="upload" class="panel">
+        <div class="modes" role="radiogroup" aria-label="Separation mode">
+          <label><input type="radio" name="mode" value="4stems" checked /> 4 stems</label>
+          <label><input type="radio" name="mode" value="6stems" /> 6 stems (adds guitar and piano)</label>
+        </div>
+        <div id="drop" class="drop">
+          <p>Drop an audio or video file here</p>
+          <button id="browse" class="btn primary">Browse my files</button>
+          <input id="file" type="file" accept="audio/*,video/*,.mkv" hidden />
+          <p class="hint">Audio (MP3, WAV, FLAC, M4A, OGG) or video (MP4, MOV, MKV, WEBM), up to 500 MB</p>
+        </div>
+      </section>
+
+      <section id="progress" class="panel" hidden>
+        <p id="progress-name" class="song"></p>
+        <p id="progress-label">Uploading file</p>
+        <div class="bar"><div id="progress-fill"></div></div>
+        <p id="progress-error" class="error" hidden></p>
+        <button id="retry" class="btn" hidden>Try another file</button>
+      </section>
+
+      <section id="mixer" hidden>
+        <div class="transport">
+          <button id="play" class="btn primary round" aria-label="Play">▶</button>
+          <span id="time" class="time">0:00 / 0:00</span>
+          <span id="analysis" class="analysis" hidden>
+            <span class="stat"><b id="bpm"></b> BPM</span>
+            <span class="stat"><b id="meter"></b> time</span>
+          </span>
+          <span id="song-name" class="song"></span>
+          <span class="spacer"></span>
+          <button id="export" class="btn">Export mix (WAV)</button>
+          <button id="export-stems" class="btn">Export all stems (ZIP)</button>
+          <button id="new" class="btn">New song</button>
+        </div>
+        <div id="lanes" class="lanes">
+          <div id="playhead" class="playhead"></div>
+        </div>
+        <p class="hint">Click a waveform to jump there. Space plays and pauses. ⤓ downloads one stem as WAV at its slider volume.</p>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,146 @@
+:root {
+  --bg: #16171c;
+  --panel: #1e1f27;
+  --panel-2: #262833;
+  --line: #31333f;
+  --text: #ececf1;
+  --muted: #9a9cab;
+  --accent: #6c63d9;
+  --danger: #ff6b7a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+}
+
+main { max-width: 1080px; margin: 0 auto; padding: 48px 16px 64px; }
+
+header { text-align: center; margin-bottom: 40px; }
+.eyebrow { text-transform: uppercase; letter-spacing: .08em; font-weight: 700; font-size: 13px; margin: 0; }
+h1 { font-size: clamp(40px, 8vw, 72px); margin: 12px 0 8px; letter-spacing: -.02em; }
+.lede { color: var(--muted); font-size: clamp(16px, 2.4vw, 22px); margin: 0; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.modes { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; color: var(--muted); }
+.modes input { accent-color: var(--accent); }
+
+.drop {
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  padding: 36px 16px;
+  transition: border-color .15s, background .15s;
+}
+.drop.over { border-color: var(--accent); background: rgba(108, 99, 217, .08); }
+.drop p { margin: 0 0 16px; }
+.hint { color: var(--muted); font-size: 14px; margin: 16px 0 0; }
+
+.btn {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--muted); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.primary { background: transparent; border: 2px solid var(--accent); padding: 12px 32px; font-size: 18px; }
+.btn.primary:hover { background: rgba(108, 99, 217, .15); }
+.btn.round { width: 48px; height: 48px; padding: 0; font-size: 16px; }
+
+.song { font-weight: 600; margin: 0 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 12px; }
+#progress-fill { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+#progress-label { color: var(--muted); margin: 0; }
+.error { color: var(--danger); white-space: pre-wrap; text-align: left; font-size: 14px; }
+
+.transport { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.transport .song { margin: 0; max-width: 320px; color: var(--muted); font-weight: 400; }
+.time { font-variant-numeric: tabular-nums; }
+.analysis { display: flex; gap: 8px; }
+.analysis[hidden] { display: none; }
+.stat {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.stat b { color: var(--text); font-variant-numeric: tabular-nums; font-size: 16px; }
+.spacer { flex: 1; }
+
+.lanes {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.lane { display: grid; grid-template-columns: 240px 1fr; grid-template-rows: 96px; border-bottom: 2px solid var(--bg); }
+.lane:last-of-type { border-bottom: 0; }
+.lane-ctrl {
+  background: var(--panel);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 12px 16px;
+}
+.lane-name { font-size: 18px; text-transform: capitalize; }
+.lane-btns { display: flex; gap: 6px; }
+.lane-btns button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+.lane-btns button[aria-pressed="true"].mute { background: var(--danger); color: #000; border-color: transparent; }
+.lane-btns button[aria-pressed="true"].solo { background: #ffd43b; color: #000; border-color: transparent; }
+.lane-ctrl input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--text); }
+.lane-wave { position: relative; cursor: pointer; }
+/* Absolute so the canvas's pixel size can't grow the grid row. */
+.lane-wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.lane.silent .lane-wave { opacity: .35; }
+
+/* Starts after the control column; JS sets `left` within the wave area. */
+.playhead {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: #fff;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 0 6px rgba(255, 255, 255, .6);
+}
+
+@media (max-width: 640px) {
+  .lane { grid-template-columns: 160px 1fr; grid-template-rows: 88px; }
+  .lane-ctrl { padding: 8px 10px; }
+  .lane-btns { gap: 4px; }
+  .lane-btns button { width: 24px; height: 24px; }
+  .lane-name { font-size: 15px; }
+  .transport .song { display: none; }
+}

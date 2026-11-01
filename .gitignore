@@ -1,0 +1,27 @@
+# Dependencies
+backend/.venv/
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+desktop/build/
+desktop/dist/
+*.dmg
+
+# Runtime data (uploaded songs and separated stems)
+backend/data/
+
+# Local test songs: copyrighted, never commit
+sample mp3/
+sample mp4/
+*.mp3
+*.mp4
+*.wav
+
+# OS and editor junk
+.DS_Store
+__pycache__/
+*.pyc
+.claude/
+.vscode/
+.idea/
