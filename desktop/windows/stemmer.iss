@@ -26,9 +26,11 @@ OutputBaseFilename=Stemmer-{#AppVersion}-windows-x64-setup
 SetupIconFile=..\icon\Stemmer.ico
 UninstallDisplayIcon={app}\Stemmer.exe
 LicenseFile=..\..\LICENSE
-Compression=lzma2/ultra64
+; ultra64 runs out of memory on ~1 GB of PyTorch files; max is close in size.
+Compression=lzma2/max
 SolidCompression=yes
-LZMANumBlockThreads=4
+; Compress in a separate 64-bit process instead of the 32-bit compiler.
+LZMAUseSeparateProcess=yes
 WizardStyle=modern
 
 [Tasks]
