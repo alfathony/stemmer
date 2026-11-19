@@ -4,7 +4,7 @@
 
 <p align="center"><b>Split any song into its parts and remix it, entirely on your own computer.</b></p>
 
-<p align="center"><a href="https://stemmer-tau.vercel.app"><b>Website and downloads → stemmer-tau.vercel.app</b></a></p>
+<p align="center"><a href="https://stemmer.alfathony.com"><b>Website and downloads → stemmer.alfathony.com</b></a></p>
 
 ![Stemmer: a song split into vocals, drums, bass, guitar, piano and other, each with its own waveform, volume, mute, solo and download controls](docs/screenshot.png)
 
@@ -32,7 +32,7 @@ Everything runs locally. Your songs never leave your computer, there's no accoun
 
 ## Download
 
-**[⬇ Download from the website](https://stemmer-tau.vercel.app/#download)**, which picks the right file for your computer, or get it from the [latest GitHub release](https://github.com/alfathony/stemmer/releases/latest).
+**[⬇ Download from the website](https://stemmer.alfathony.com/#download)**, which picks the right file for your computer, or get it from the [latest GitHub release](https://github.com/alfathony/stemmer/releases/latest).
 
 | Your computer | File |
 |---|---|
@@ -104,9 +104,9 @@ To build without releasing, use **Actions → Build installers → Run workflow*
 cd site && python3 -m http.server 5300      # preview at http://127.0.0.1:5300
 ```
 
-It's live at https://stemmer-tau.vercel.app. The Vercel project `stemmer` is connected to this repo with root directory `site/`, so **every push to `main` redeploys it automatically**. To deploy by hand from the repo root, run `npx vercel@latest deploy --prod`. `.vercelignore` makes sure only `site/` is uploaded.
+It's live at https://stemmer.alfathony.com. The Vercel project `stemmer` is connected to this repo with root directory `site/`, so **every push to `main` redeploys it automatically**. To deploy by hand from the repo root, run `npx vercel@latest deploy --prod`. `.vercelignore` makes sure only `site/` is uploaded.
 
-The logo and every app icon come from `desktop/icon/make_icon.py`. Screenshots come from `desktop/screenshot.py`.
+The logo and every app icon come from `desktop/icon/make_icon.py`. The social card (`site/og.jpg`, designed in `site/og/card.html`) and the web favicons come from `desktop/make_web_assets.py`. Screenshots come from `desktop/screenshot.py`.
 
 <details>
 <summary>Project layout and API</summary>
