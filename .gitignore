@@ -25,3 +25,7 @@ __pycache__/
 .claude/
 .vscode/
 .idea/
+
+# Vercel CLI link and pulled env files
+.vercel/
+.env*

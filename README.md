@@ -4,6 +4,8 @@
 
 <p align="center"><b>Split any song into its parts and remix it, entirely on your own computer.</b></p>
 
+<p align="center"><a href="https://stemmer-tau.vercel.app"><b>Website and downloads → stemmer-tau.vercel.app</b></a></p>
+
 ![Stemmer: a song split into vocals, drums, bass, guitar, piano and other, each with its own waveform, volume, mute, solo and download controls](docs/screenshot.png)
 
 ## What is Stemmer?
@@ -30,7 +32,7 @@ Everything runs locally. Your songs never leave your computer, there's no accoun
 
 ## Download
 
-**[⬇ Download the latest release](https://github.com/alfathony/stemmer/releases/latest)**
+**[⬇ Download from the website](https://stemmer-tau.vercel.app/#download)**, which picks the right file for your computer, or get it from the [latest GitHub release](https://github.com/alfathony/stemmer/releases/latest).
 
 | Your computer | File |
 |---|---|
@@ -100,8 +102,9 @@ To build without releasing, use **Actions → Build installers → Run workflow*
 
 ```bash
 cd site && python3 -m http.server 5300      # preview at http://127.0.0.1:5300
-vercel deploy site --prod                  # publish (Vercel project root: site/)
 ```
+
+It's live at https://stemmer-tau.vercel.app. The Vercel project `stemmer` is connected to this repo with root directory `site/`, so **every push to `main` redeploys it automatically**. To deploy by hand from the repo root, run `npx vercel@latest deploy --prod`. `.vercelignore` makes sure only `site/` is uploaded.
 
 The logo and every app icon come from `desktop/icon/make_icon.py`. Screenshots come from `desktop/screenshot.py`.
 
