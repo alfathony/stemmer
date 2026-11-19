@@ -3,27 +3,31 @@ import { Mixer, type Track } from "./mixer";
 import { computePeaks, drawWaveform } from "./waveform";
 import { makeZip } from "./zip";
 
-// Lane colours: [background, waveform]
-const STEM_COLORS: Record<string, [string, string]> = {
-  vocals: ["#3b3670", "#8b7dff"],
-  drums: ["#5a2738", "#ff5c84"],
-  bass: ["#6b6a24", "#f4f000"],
-  other: ["#22704b", "#2dff9a"],
-  guitar: ["#6e4520", "#ffa24c"],
-  piano: ["#1f5a6b", "#56d9ff"],
+// Stem colours, matching the logo. Lane backgrounds are a tint of the same colour.
+const STEM_COLORS: Record<string, string> = {
+  vocals: "#8b7dff",
+  drums: "#ff5c84",
+  bass: "#f7e35a",
+  guitar: "#ff9f4a",
+  piano: "#4cc9f0",
+  other: "#2de39a",
 };
 const STEM_ORDER = ["vocals", "drums", "bass", "guitar", "piano", "other"];
-const CTRL_WIDTH = () => (window.innerWidth <= 640 ? 160 : 240);
+const stemColor = (name: string) => STEM_COLORS[name] ?? "#a0a3b5";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const sections = { upload: $("upload"), progress: $("progress"), mixer: $("mixer") };
 
 let mixer: Mixer | null = null;
-let lanes: { track: Track; el: HTMLElement; canvas: HTMLCanvasElement; peaks: Float32Array }[] = [];
+let lanes: { track: Track; strip: HTMLElement; lane: HTMLElement; canvas: HTMLCanvasElement; peaks: Float32Array }[] = [];
 let songName = "";
 
 function show(name: keyof typeof sections) {
   for (const [k, el] of Object.entries(sections)) el.hidden = k !== name;
+  const inMixer = name === "mixer";
+  $("song-meta").hidden = !inMixer;
+  $("top-actions").hidden = !inMixer;
+  $("transport").hidden = !inMixer;
 }
 
 // ---------- upload ----------
@@ -33,21 +37,48 @@ const drop = $("drop");
 
 $("browse").onclick = () => fileInput.click();
 fileInput.onchange = () => fileInput.files?.[0] && start(fileInput.files[0]);
-drop.ondragover = (e) => {
+// The whole window accepts drops on the home screen, not just the box.
+document.addEventListener("dragover", (e) => {
+  if (sections.upload.hidden) return;
   e.preventDefault();
   drop.classList.add("over");
-};
-drop.ondragleave = () => drop.classList.remove("over");
-drop.ondrop = (e) => {
+});
+document.addEventListener("dragleave", (e) => {
+  if (!e.relatedTarget) drop.classList.remove("over");
+});
+document.addEventListener("drop", (e) => {
+  if (sections.upload.hidden) return;
   e.preventDefault();
   drop.classList.remove("over");
   const file = e.dataTransfer?.files[0];
   if (file) start(file);
-};
+});
 
-function setProgress(label: string, fraction: number) {
+// ---------- progress ----------
+
+const STAGES: { label: string; statuses: (Job["status"] | "upload" | "load")[] }[] = [
+  { label: "Uploading to the local engine", statuses: ["upload"] },
+  { label: "Reading audio", statuses: ["queued", "extracting"] },
+  { label: "Separating stems with AI", statuses: ["processing"] },
+  { label: "Encoding stems", statuses: ["encoding"] },
+  { label: "Detecting tempo and time signature", statuses: ["analyzing"] },
+  { label: "Loading the mixer", statuses: ["done", "load"] },
+];
+
+function setProgress(status: Job["status"] | "upload" | "load", label: string, fraction: number) {
+  const pct = Math.round(fraction * 100);
   $("progress-label").textContent = label;
-  $("progress-fill").style.width = `${Math.round(fraction * 100)}%`;
+  $("progress-fill").style.width = `${pct}%`;
+  $("progress-pct").textContent = `${pct}%`;
+  const current = STAGES.findIndex((s) => s.statuses.includes(status));
+  $("stages").innerHTML = "";
+  STAGES.forEach((s, i) => {
+    const li = document.createElement("li");
+    li.textContent = s.label;
+    if (i < current) li.className = "done";
+    else if (i === current) li.className = "active";
+    $("stages").appendChild(li);
+  });
 }
 
 const STATUS_LABEL: Record<Job["status"], string> = {
@@ -61,7 +92,7 @@ const STATUS_LABEL: Record<Job["status"], string> = {
 };
 
 async function start(file: File) {
-  const mode = (document.querySelector<HTMLInputElement>('input[name="mode"]:checked')!.value) as Mode;
+  const mode = document.querySelector<HTMLInputElement>('input[name="mode"]:checked')!.value as Mode;
   songName = file.name;
   $("progress-name").textContent = file.name;
   $("progress-error").hidden = true;
@@ -70,13 +101,13 @@ async function start(file: File) {
 
   try {
     // Overall bar: upload 0–10%, separation 10–90%, downloading stems 90–100%.
-    setProgress("Uploading file", 0);
-    const job = await createJob(file, mode, (f) => setProgress(`Uploading file ${Math.round(f * 100)}%`, f * 0.1));
+    setProgress("upload", "Uploading file", 0);
+    const job = await createJob(file, mode, (f) => setProgress("upload", `Uploading file ${Math.round(f * 100)}%`, f * 0.1));
     const done = await waitForJob(job.id, (j) => {
       const pct = j.status === "processing" ? ` ${Math.round(j.progress * 100)}%` : "";
-      setProgress(STATUS_LABEL[j.status] + pct, 0.1 + j.progress * 0.8);
+      setProgress(j.status, STATUS_LABEL[j.status] + pct, 0.1 + j.progress * 0.8);
     });
-    await loadStems(done, (f) => setProgress("Loading stems", 0.9 + f * 0.1));
+    await loadStems(done, (f) => setProgress("load", "Loading stems", 0.9 + f * 0.1));
     showAnalysis(done.analysis);
     show("mixer");
     renderLanes();
@@ -120,80 +151,159 @@ async function loadStems(job: Job, onProgress: (f: number) => void) {
   names.forEach((name, i) => mixer!.addTrack(name, buffers[i]));
 }
 
+const ICON_DOWNLOAD =
+  '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9m0 0-3.5-3.5M10 12l3.5-3.5M4 14v2h12v-2"/></svg>';
+
+function tint(hex: string, alpha: number) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
 function renderLanes() {
-  const container = $("lanes");
-  container.querySelectorAll(".lane").forEach((el) => el.remove());
+  const strips = $("strips");
+  const lanesEl = $("lanes");
+  strips.querySelectorAll(".strip").forEach((el) => el.remove());
+  lanesEl.innerHTML = "";
   lanes = [];
   $("song-name").textContent = songName;
+  $("duration").textContent = fmt(mixer!.duration);
+  $("total").textContent = fmt(mixer!.duration);
 
+  fitLanes();
   for (const track of mixer!.tracks) {
-    const [bg, fg] = STEM_COLORS[track.name] ?? ["#333", "#aaa"];
-    const el = document.createElement("div");
-    el.className = "lane";
-    el.innerHTML = `
-      <div class="lane-ctrl">
-        <span class="lane-name"></span>
-        <span class="lane-btns">
-          <button class="mute" aria-pressed="false" title="Mute">M</button>
-          <button class="solo" aria-pressed="false" title="Solo">S</button>
-          <button class="download" title="Download as WAV">⤓</button>
-        </span>
-        <input type="range" min="0" max="1.5" step="0.01" value="1" />
-      </div>
-      <div class="lane-wave" style="background:${bg}"><canvas></canvas></div>`;
-    el.querySelector(".lane-name")!.textContent = track.name;
-    const slider = el.querySelector<HTMLInputElement>("input")!;
+    const color = stemColor(track.name);
+    const strip = document.createElement("div");
+    strip.className = "strip";
+    strip.style.setProperty("--c", color);
+    strip.innerHTML = `
+      <span class="strip-name"></span>
+      <span class="strip-btns">
+        <button class="mute" aria-pressed="false" title="Mute">M</button>
+        <button class="solo" aria-pressed="false" title="Solo">S</button>
+        <button class="download" title="Download this stem as WAV">${ICON_DOWNLOAD}</button>
+      </span>
+      <label class="vol"><input type="range" min="0" max="1.5" step="0.01" value="1" /><output>100%</output></label>`;
+    strip.querySelector(".strip-name")!.textContent = track.name;
+
+    const slider = strip.querySelector<HTMLInputElement>("input")!;
+    const out = strip.querySelector("output")!;
     slider.setAttribute("aria-label", `${track.name} volume`);
     slider.oninput = () => {
       track.volume = Number(slider.value);
+      out.textContent = `${Math.round(track.volume * 100)}%`;
       refreshGains();
     };
-    const toggle = (cls: "mute" | "solo") => {
-      const btn = el.querySelector<HTMLButtonElement>(`.${cls}`)!;
+    slider.ondblclick = () => {
+      slider.value = "1";
+      slider.dispatchEvent(new Event("input"));
+    };
+    for (const cls of ["mute", "solo"] as const) {
+      const btn = strip.querySelector<HTMLButtonElement>(`.${cls}`)!;
+      btn.setAttribute("aria-label", `${cls === "mute" ? "Mute" : "Solo"} ${track.name}`);
       btn.onclick = () => {
         if (cls === "mute") track.muted = !track.muted;
         else track.solo = !track.solo;
         btn.setAttribute("aria-pressed", String(cls === "mute" ? track.muted : track.solo));
         refreshGains();
       };
-    };
-    toggle("mute");
-    toggle("solo");
-    const dl = el.querySelector<HTMLButtonElement>(".download")!;
+    }
+    const dl = strip.querySelector<HTMLButtonElement>(".download")!;
     dl.setAttribute("aria-label", `Download ${track.name} as WAV`);
     dl.onclick = () =>
       busy(dl, "…", async () => download(await mixer!.exportTrack(track), `${baseName()} - ${track.name}.wav`));
+    strips.appendChild(strip);
 
-    const wave = el.querySelector<HTMLElement>(".lane-wave")!;
-    wave.onclick = (e) => {
-      const rect = wave.getBoundingClientRect();
-      mixer!.seek(((e.clientX - rect.left) / rect.width) * mixer!.duration);
-      tick();
-    };
-
-    container.appendChild(el);
-    const canvas = el.querySelector("canvas")!;
-    const peaks = computePeaks(track.buffer, 1200);
-    drawWaveform(canvas, peaks, fg);
-    lanes.push({ track, el, canvas, peaks });
+    const lane = document.createElement("div");
+    lane.className = "lane";
+    lane.style.background = `linear-gradient(180deg, ${tint(color, 0.1)}, ${tint(color, 0.05)})`;
+    lane.innerHTML = "<canvas></canvas>";
+    lanesEl.appendChild(lane);
+    const canvas = lane.querySelector("canvas")!;
+    const peaks = computePeaks(track.buffer, 1600);
+    drawWaveform(canvas, peaks, color);
+    lanes.push({ track, strip, lane, canvas, peaks });
   }
+  drawRuler();
+  refreshGains();
   updatePlayButton();
+}
+
+// Click or drag anywhere on the timeline to seek.
+const timeline = $("timeline");
+let dragging = false;
+function seekToPointer(e: PointerEvent) {
+  if (!mixer) return;
+  const rect = timeline.getBoundingClientRect();
+  const f = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  mixer.seek(f * mixer.duration);
   tick();
+}
+timeline.addEventListener("pointerdown", (e) => {
+  dragging = true;
+  timeline.setPointerCapture(e.pointerId);
+  seekToPointer(e);
+});
+timeline.addEventListener("pointermove", (e) => dragging && seekToPointer(e));
+timeline.addEventListener("pointerup", () => (dragging = false));
+
+/** Stretch lanes to fill the window (72–140 px each), so few stems don't leave a gap. */
+function fitLanes() {
+  if (!mixer || sections.mixer.hidden) return;
+  const pane = sections.mixer;
+  const style = getComputedStyle(pane);
+  const ruler = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ruler-h"));
+  const free = pane.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - ruler - 2;
+  const h = Math.max(72, Math.min(140, Math.floor(free / mixer.tracks.length)));
+  document.querySelector<HTMLElement>(".tracks")!.style.setProperty("--lane-h", `${h}px`);
+}
+
+function drawRuler() {
+  const ruler = $("ruler");
+  ruler.innerHTML = "";
+  if (!mixer) return;
+  const width = ruler.clientWidth;
+  const dur = mixer.duration;
+  // Pick a tick spacing that keeps labels at least ~70 px apart.
+  const step = [1, 2, 5, 10, 15, 30, 60, 120].find((s) => (s / dur) * width >= 70) ?? 300;
+  // Stop before the last ~40 px so the final label isn't cut off at the edge.
+  for (let t = 0; (t / dur) * width < width - 40; t += step) {
+    const span = document.createElement("span");
+    span.style.left = `${(t / dur) * 100}%`;
+    span.textContent = fmt(t);
+    ruler.appendChild(span);
+  }
 }
 
 function refreshGains() {
   mixer!.updateGains();
-  for (const { track, el } of lanes) el.classList.toggle("silent", mixer!.effectiveGain(track) === 0);
+  for (const { track, strip, lane } of lanes) {
+    const silent = mixer!.effectiveGain(track) === 0;
+    strip.classList.toggle("silent", silent);
+    lane.classList.toggle("silent", silent);
+  }
 }
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const fmtPrecise = (s: number) => `${fmt(s)}.${Math.floor((s % 1) * 10)}`;
+
+const scrub = $<HTMLInputElement>("scrub");
+let scrubbing = false;
+scrub.addEventListener("pointerdown", () => (scrubbing = true));
+scrub.addEventListener("pointerup", () => (scrubbing = false));
+scrub.addEventListener("input", () => {
+  if (!mixer) return;
+  mixer.seek((Number(scrub.value) / 1000) * mixer.duration);
+  tick();
+});
 
 function tick() {
   if (!mixer) return;
   const t = mixer.currentTime;
-  $("time").textContent = `${fmt(t)} / ${fmt(mixer.duration)}`;
-  const waveWidth = $("lanes").clientWidth - CTRL_WIDTH();
-  $("playhead").style.left = `${CTRL_WIDTH() + (t / mixer.duration) * waveWidth}px`;
+  const f = mixer.duration ? t / mixer.duration : 0;
+  $("time").textContent = fmtPrecise(t);
+  $("playhead").style.left = `${f * 100}%`;
+  $("unplayed").style.left = `${f * 100}%`;
+  if (!scrubbing) scrub.value = String(Math.round(f * 1000));
 }
 
 (function loop() {
@@ -204,7 +314,7 @@ function tick() {
 function updatePlayButton() {
   const btn = $("play");
   const playing = mixer?.playing ?? false;
-  btn.textContent = playing ? "❚❚" : "▶";
+  btn.classList.toggle("playing", playing);
   btn.setAttribute("aria-label", playing ? "Pause" : "Play");
   tick();
 }
@@ -217,11 +327,27 @@ async function togglePlay() {
 }
 
 $("play").onclick = togglePlay;
+$("rewind").onclick = () => {
+  mixer?.seek(0);
+  tick();
+};
 document.addEventListener("keydown", (e) => {
-  if (e.code !== "Space" || sections.mixer.hidden) return;
-  if ((e.target as HTMLElement).matches("input, button")) return;
-  e.preventDefault();
-  void togglePlay();
+  if (sections.mixer.hidden || !mixer) return;
+  const on = (sel: string) => e.target instanceof Element && e.target.matches(sel);
+  if (on("input:not([type=range]), textarea")) return;
+  if (e.code === "Space") {
+    if (on("button")) return;
+    e.preventDefault();
+    void togglePlay();
+  } else if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
+    if (on("input[type=range]")) return;
+    e.preventDefault();
+    mixer.seek(mixer.currentTime + (e.code === "ArrowLeft" ? -5 : 5));
+    tick();
+  } else if (e.code === "Home") {
+    mixer.seek(0);
+    tick();
+  }
 });
 
 const baseName = () => songName.replace(/\.[^.]+$/, "");
@@ -251,7 +377,7 @@ async function download(blob: Blob, filename: string) {
 
 /** Disable a button and show `label` while `work` runs. */
 async function busy(btn: HTMLButtonElement, label: string, work: () => Promise<void>) {
-  const original = btn.textContent;
+  const original = btn.innerHTML;
   btn.disabled = true;
   btn.textContent = label;
   try {
@@ -260,35 +386,70 @@ async function busy(btn: HTMLButtonElement, label: string, work: () => Promise<v
     alert(`Export failed: ${(err as Error).message}`);
   } finally {
     btn.disabled = false;
-    btn.textContent = original;
+    btn.innerHTML = original;
   }
 }
 
-$("export").onclick = () =>
-  busy($("export"), "Rendering…", async () => download(await mixer!.exportMix(), `${baseName()} (mix).wav`));
+// Export menu
+const exportMenu = $<HTMLButtonElement>("export-menu");
+const exportList = $("export-list");
+function setMenu(open: boolean) {
+  exportList.hidden = !open;
+  exportMenu.setAttribute("aria-expanded", String(open));
+}
+exportMenu.onclick = (e) => {
+  e.stopPropagation();
+  setMenu(exportList.hidden);
+};
+document.addEventListener("click", (e) => {
+  if (!exportList.contains(e.target as Node)) setMenu(false);
+});
+document.addEventListener("keydown", (e) => e.key === "Escape" && setMenu(false));
 
-$("export-stems").onclick = () => {
-  const btn = $<HTMLButtonElement>("export-stems");
-  return busy(btn, "Rendering…", async () => {
+/** Run an export, showing progress on the Export button while the menu is closed. */
+function exportTask(label: string, work: (status: (s: string) => void) => Promise<void>) {
+  setMenu(false);
+  const original = exportMenu.innerHTML;
+  exportMenu.disabled = true;
+  exportMenu.textContent = label;
+  return work((s) => (exportMenu.textContent = s))
+    .catch((err) => alert(`Export failed: ${(err as Error).message}`))
+    .finally(() => {
+      exportMenu.disabled = false;
+      exportMenu.innerHTML = original;
+    });
+}
+
+$("export").onclick = () =>
+  exportTask("Rendering mix…", async () => download(await mixer!.exportMix(), `${baseName()} (mix).wav`));
+
+$("export-stems").onclick = () =>
+  exportTask("Rendering…", async (status) => {
     const files = [];
     for (const [i, track] of mixer!.tracks.entries()) {
-      btn.textContent = `Rendering ${i + 1}/${mixer!.tracks.length}…`;
+      status(`Rendering ${i + 1}/${mixer!.tracks.length}…`);
       files.push({ name: `${baseName()} - ${track.name}.wav`, blob: await mixer!.exportTrack(track) });
     }
-    btn.textContent = "Zipping…";
+    status("Zipping…");
     await download(await makeZip(files), `${baseName()} (stems).zip`);
   });
-};
 
-$("new").onclick = async () => {
+async function newSong() {
   await mixer?.close();
   mixer = null;
   show("upload");
+}
+$("new").onclick = newSong;
+$("home-link").onclick = (e) => {
+  e.preventDefault();
+  if (sections.progress.hidden) void newSong();
 };
 
 window.addEventListener("resize", () => {
-  for (const { canvas, peaks, track } of lanes) {
-    drawWaveform(canvas, peaks, (STEM_COLORS[track.name] ?? ["", "#aaa"])[1]);
-  }
+  fitLanes();
+  for (const { canvas, peaks, track } of lanes) drawWaveform(canvas, peaks, stemColor(track.name));
+  drawRuler();
   tick();
 });
+
+show("upload");

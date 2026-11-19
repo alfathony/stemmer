@@ -3,58 +3,115 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
     <title>Stemmer</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
+    <header class="topbar">
+      <a class="brand" href="#" id="home-link" aria-label="Stemmer home">
+        <img src="/favicon.svg" alt="" width="34" height="22" />
+        <span>Stemmer</span>
+      </a>
+
+      <div class="song-meta" id="song-meta" hidden>
+        <span id="song-name" class="song-title"></span>
+        <span id="analysis" class="chips" hidden>
+          <span class="chip"><b id="bpm"></b> BPM</span>
+          <span class="chip"><b id="meter"></b></span>
+        </span>
+        <span class="chip" id="duration-chip"><b id="duration"></b></span>
+      </div>
+
+      <div class="top-actions" id="top-actions" hidden>
+        <div class="menu-wrap">
+          <button id="export-menu" class="btn" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9m0 0-3.5-3.5M10 12l3.5-3.5M4 14v2h12v-2" /></svg>
+            Export
+          </button>
+          <div class="menu" id="export-list" role="menu" hidden>
+            <button id="export" role="menuitem">
+              <strong>Mix as WAV</strong><small>Everything you hear, one file</small>
+            </button>
+            <button id="export-stems" role="menuitem">
+              <strong>All stems as ZIP</strong><small>Each stem as its own WAV</small>
+            </button>
+          </div>
+        </div>
+        <button id="new" class="btn ghost">New song</button>
+      </div>
+    </header>
+
     <main>
-      <header>
-        <p class="eyebrow">Stem separator</p>
-        <h1>Stemmer</h1>
-        <p class="lede">Split a song into vocals, drums, bass and the rest, then remix it.</p>
-      </header>
-
-      <section id="upload" class="panel">
-        <div class="modes" role="radiogroup" aria-label="Separation mode">
-          <label><input type="radio" name="mode" value="4stems" checked /> 4 stems</label>
-          <label><input type="radio" name="mode" value="6stems" /> 6 stems (adds guitar and piano)</label>
-        </div>
+      <!-- Home: pick a song -->
+      <section id="upload" class="home">
         <div id="drop" class="drop">
-          <p>Drop an audio or video file here</p>
-          <button id="browse" class="btn primary">Browse my files</button>
+          <img class="drop-art" src="/favicon.svg" alt="" width="132" height="86" />
+          <h1>Drop a song to split it</h1>
+          <p class="lede">Vocals, drums, bass and more, each on its own track, ready to mix and export.</p>
+
+          <div class="segmented" role="radiogroup" aria-label="Separation mode">
+            <label><input type="radio" name="mode" value="4stems" checked /><span>4 stems</span></label>
+            <label><input type="radio" name="mode" value="6stems" /><span>6 stems <em>+ guitar, piano</em></span></label>
+          </div>
+
+          <button id="browse" class="btn primary">Choose a file</button>
           <input id="file" type="file" accept="audio/*,video/*,.mkv" hidden />
-          <p class="hint">Audio (MP3, WAV, FLAC, M4A, OGG) or video (MP4, MOV, MKV, WEBM), up to 500 MB</p>
+          <p class="formats">MP3 · WAV · FLAC · M4A · OGG · MP4 · MOV · MKV · WEBM, up to 500 MB</p>
+        </div>
+        <p class="privacy">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 9V7a5 5 0 0 1 10 0v2M4 9h12v8H4z" /></svg>
+          Runs entirely on this computer. Your music is never uploaded.
+        </p>
+      </section>
+
+      <!-- Separating -->
+      <section id="progress" class="progress" hidden>
+        <div class="card">
+          <p class="eyebrow">Splitting</p>
+          <p id="progress-name" class="progress-song"></p>
+          <div class="progress-row">
+            <div class="bar"><div id="progress-fill"></div></div>
+            <span id="progress-pct">0%</span>
+          </div>
+          <p id="progress-label" class="progress-label">Uploading file</p>
+          <ol id="stages" class="stages"></ol>
+          <p id="progress-error" class="error" hidden></p>
+          <button id="retry" class="btn" hidden>Try another file</button>
         </div>
       </section>
 
-      <section id="progress" class="panel" hidden>
-        <p id="progress-name" class="song"></p>
-        <p id="progress-label">Uploading file</p>
-        <div class="bar"><div id="progress-fill"></div></div>
-        <p id="progress-error" class="error" hidden></p>
-        <button id="retry" class="btn" hidden>Try another file</button>
-      </section>
-
-      <section id="mixer" hidden>
-        <div class="transport">
-          <button id="play" class="btn primary round" aria-label="Play">▶</button>
-          <span id="time" class="time">0:00 / 0:00</span>
-          <span id="analysis" class="analysis" hidden>
-            <span class="stat"><b id="bpm"></b> BPM</span>
-            <span class="stat"><b id="meter"></b> time</span>
-          </span>
-          <span id="song-name" class="song"></span>
-          <span class="spacer"></span>
-          <button id="export" class="btn">Export mix (WAV)</button>
-          <button id="export-stems" class="btn">Export all stems (ZIP)</button>
-          <button id="new" class="btn">New song</button>
+      <!-- Mixer -->
+      <section id="mixer" class="mixer" hidden>
+        <div class="tracks">
+          <div class="strips" id="strips">
+            <div class="strips-head">Stems</div>
+          </div>
+          <div class="timeline" id="timeline">
+            <div class="ruler" id="ruler"></div>
+            <div id="lanes" class="lanes"></div>
+            <div class="unplayed" id="unplayed"></div>
+            <div id="playhead" class="playhead"></div>
+          </div>
         </div>
-        <div id="lanes" class="lanes">
-          <div id="playhead" class="playhead"></div>
-        </div>
-        <p class="hint">Click a waveform to jump there. Space plays and pauses. ⤓ downloads one stem as WAV at its slider volume.</p>
       </section>
     </main>
+
+    <footer class="transport" id="transport" hidden>
+      <button id="rewind" class="icon-btn" aria-label="Back to start" title="Back to start (Home)">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4v12M16 4 7 10l9 6z" /></svg>
+      </button>
+      <button id="play" class="play" aria-label="Play" title="Play / pause (Space)">
+        <svg class="i-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z" /></svg>
+        <svg class="i-pause" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4h3v12H6zM11 4h3v12h-3z" /></svg>
+      </button>
+      <span id="time" class="time">0:00.0</span>
+      <input id="scrub" class="scrub" type="range" min="0" max="1000" value="0" aria-label="Position" />
+      <span id="total" class="time muted">0:00</span>
+      <span class="keys"><kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> 5 s</span>
+    </footer>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1,6 +1,8 @@
-# Stemmer
+<p align="center"><img src="desktop/icon/icon.png" width="112" alt="Stemmer logo: a waveform splitting into four coloured stems" /></p>
 
-**Split any song into its parts and remix it, entirely on your own computer.**
+<h1 align="center">Stemmer</h1>
+
+<p align="center"><b>Split any song into its parts and remix it, entirely on your own computer.</b></p>
 
 ![Stemmer: a song split into vocals, drums, bass, guitar, piano and other, each with its own waveform, volume, mute, solo and download controls](docs/screenshot.png)
 
@@ -92,6 +94,17 @@ git tag v0.2.0 && git push origin v0.2.0   # → release "Stemmer 0.2.0" with th
 
 To build without releasing, use **Actions → Build installers → Run workflow**; the installers appear under the run's *Artifacts*. You can also check any packaged app yourself with `Stemmer --selftest report.json`, which separates a generated 128 BPM drum loop and checks the stems, the tempo and the meter.
 
+### Landing page
+
+`site/` is a static download page with no build step. It detects Mac or Windows and gets the newest installer links and sizes from the GitHub Releases API, so it never needs editing for a new version.
+
+```bash
+cd site && python3 -m http.server 5300      # preview at http://127.0.0.1:5300
+vercel deploy site --prod                  # publish (Vercel project root: site/)
+```
+
+The logo and every app icon come from `desktop/icon/make_icon.py`. Screenshots come from `desktop/screenshot.py`.
+
 <details>
 <summary>Project layout and API</summary>
 
@@ -99,6 +112,7 @@ To build without releasing, use **Actions → Build installers → Run workflow*
 backend/    FastAPI server: upload → Demucs separation → tempo/meter analysis → stems
 frontend/   Vite + TypeScript UI: upload, Web Audio mixer, waveforms, WAV/ZIP export
 desktop/    Desktop app: native window launcher, PyInstaller spec, icons, Mac/Windows build scripts, Inno Setup installer
+site/       Download landing page (static, deployed on Vercel)
 ```
 
 | Method | Path | |

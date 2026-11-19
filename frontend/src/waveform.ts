@@ -33,11 +33,22 @@ export function drawWaveform(
   const g = canvas.getContext("2d")!;
   g.scale(dpr, dpr);
   g.clearRect(0, 0, width, height);
-  g.fillStyle = color;
   const mid = height / 2;
-  const barW = width / peaks.length;
-  for (let i = 0; i < peaks.length; i++) {
-    const h = Math.max(1, peaks[i] * (height * 0.42));
-    g.fillRect(i * barW, mid - h, Math.max(barW, 1), h * 2);
+
+  // Faint centre line, then 2 px bars with 1 px gaps (each bar = loudest peak in its span).
+  g.fillStyle = color;
+  g.globalAlpha = 0.35;
+  g.fillRect(0, mid - 0.5, width, 1);
+  g.globalAlpha = 1;
+  const bar = 2;
+  const pitch = 3;
+  const bars = Math.max(1, Math.floor(width / pitch));
+  for (let b = 0; b < bars; b++) {
+    const from = Math.floor((b / bars) * peaks.length);
+    const to = Math.max(from + 1, Math.floor(((b + 1) / bars) * peaks.length));
+    let p = 0;
+    for (let i = from; i < to; i++) if (peaks[i] > p) p = peaks[i];
+    const h = Math.max(1, p * (height * 0.4));
+    g.fillRect(b * pitch, mid - h, bar, h * 2);
   }
 }
