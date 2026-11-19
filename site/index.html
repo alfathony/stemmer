@@ -41,7 +41,9 @@
       -webkit-font-smoothing: antialiased;
     }
     a { color: inherit; }
-    img { max-width: 100%; display: block; }
+    /* height: auto keeps the aspect ratio when max-width shrinks an image
+       that has width/height attributes (they're there to reserve space). */
+    img { max-width: 100%; height: auto; display: block; }
     .wrap { width: min(1140px, 100% - 32px); margin: 0 auto; }
 
     /* nav */
